@@ -1,0 +1,132 @@
+RFC 854
+
+Clearly, a party may always refuse a request to enable,
+and must never refuse a request to disable some
+option since all parties must be prepared to support the NVT.
+
+WILL XXX is sent, by either party, to indicate that
+party's desire (offer) to begin performing option XXX, DO XXX and
+DON'T XXX being its positive and negative acknowledgments;
+
+DO XXX is sent to indicate a desire (request) that the other party
+(i.e., the recipient of the DO) begin performing option XXX, WILL XXX
+and WON'T XXX being the positive and negative acknowledgments. 
+
+RFC 1143
+
+As specified by RFC 854: A TELNET implementation MUST obey a refusal
+to enable an option; i.e., if it receives a DONT/WONT in response to
+a WILL/DO, it MUST NOT enable the option
+
+Rule: Remember DONT/WONT requests
+-=-=--=-=--=-=--=-=--=-=-=-=-=-=-
+When starting negotiating with a DONT/WONT, should the initiator
+remember negotiation state (as it does for DO/WILL), or should 
+the initiator straight away disable ?
+Initiator should remember the negotiation state as it turns out. Here is why:
+
+1  He decides to disable.  He sends DONT and disables the option.
+2  He decides to reenable.  He sends DO and remembers he is negotiating.
+3    We receive DONT and sigh.  We respond WONT and disable the option.
+4    We receive DO but disagree.  We respond WONT.
+5  He receives WONT and gives up on negotiation.
+6  He decides to try once again to reenable. He sends DO and remembers he is negotiating.
+7  He receives WONT and gives up on negotiation. For whatever reason, he decides to agree with future requests.
+8    We receive DO and decide to agree.  We respond WILL and enable the option.
+9    We decide to disable.  We send WONT and disable the option. For whatever reason, we decide to agree with future requests.
+
+10 He receives WILL and agrees. He responds DO and enables the option.
+11 He receives WONT and sighs. He responds DONT and disables the option.
+12   We receive DO and agree.  We send WILL and enable the option.
+13   We receive DONT and sigh.  We send.
+
+10/11 for He, and 12/13 for We are in repeat forever.
+
+Rule: Prohibit new requests before completing old negotiation
+-=-=--=-=--=-=--=-=--=-=-=-=-=-=-=-=--=-=--=-=--=-=--=-=-=-=-
+A TELNET implementation MUST NOT initiate a new WILL/WONT/DO/DONT
+request about an option that is under negotiation, i.e., for which it
+has already made such a request and not yet received a response.
+Causes loop otherwise. Here is why:
+
+Suppose an option is disabled, and we decide in quick
+succession to enable it, disable it, and reenable it.  We send
+WILL WONT WILL and at the end remember that we are negotiating.
+The other side agrees with DO DONT DO. We receive the first DO,
+enable the option, and forget we have negotiated.  Now DONT DO
+are coming through the network and both sides have forgotten
+they are negotiating; consequently we loop.
+
+How to reallow the request queue
+-=-=--=--=-=--=--=-=--=--=-=--=-
+This is SHOULD and therefore we won't implement the request queue
+
+Rule: Separate WANTNO and WANTYES
+-=-=--=--=-=--=--=-=--=--=-=--=-=-
+Implementations SHOULD separate any states of negotiating WILL/DO
+from any states of negotiating WONT/DONT.
+
+It is possible to maintain a working TELNET implementation if the
+NO/YES/WANTNO/WANTYES states are simplified to NO/YES/WANT.
+However, in a hostile environment this is a bad idea, as it means
+that handling a DO/WILL response to a WONT/DONT cannot be done
+correctly.
+
+State handling during implementation
+-=-=--=--=--=-=--=--=--=-=--=--=-=-=-
+us: state of option (NO/WANTNO/WANTYES/YES) on our side 
+him: state of option on his side
+
+Choosing based on him variable:
+
+Upon reciept of WILL:
+NO      If we agree that he should enable, him=YES, send DO; otherwise, send DONT.
+YES     Ignore.
+WANTNO  Error: DONT answered by WILL. him=NO.
+WANTYES him=YES.
+
+Upon receipt of WONT:
+NO      Ignore.
+YES     him=NO, send DONT.
+WANTNO  him=NO.
+WANTYES him=NO.
+
+Before sending DO:
+NO      him=WANTYES, send DO.
+YES     Error: Already enabled.
+WANTNO  Error: Cannot initiate new request in the middle of negotiation.
+WANTYES Error: Already negotiating for enable.
+
+Before sending DONT:
+NO      Error: Already disabled.
+YES     him=WANTNO, send DONT.
+WANTNO  Error: Already negotiating for disable.
+WANTYES Error: Cannot initiate new request in the middle of negotiation.
+
+Choosing based on us variable:
+ocmd 
+We handle the option on our side by the same procedures, with DO-WILL, DONT-WONT, him-us swapped.
+
+Upon receipt of DO:
+NO      If we agree that we should enable, us=YES, send WILL; otherwise, send WONT.
+YES     Ignore.
+WANTNO  Error: WONT answered by DO. us=NO.
+WANTYES us=YES.
+
+Upon receipt of DONT:
+NO      Ignore.
+YES     us=NO, send WONT.
+WANTNO  us=NO.
+WANTYES us=NO.
+
+Before sending WILL:
+NO      us=WANTYES, send WILL.
+YES     Error: Already enabled.
+WANTNO  Error: Cannot initiate new request in the middle of negotiation.
+WANTYES Error: Already negotiating for enable.
+
+Before sending WONT:
+NO      Error: Already disabled.
+YES     us=WANTNO, send WONT.
+WANTNO  Error: Already negotiating for disable.
+WANTYES Error: Cannot initiate new request in the middle of negotiation.
